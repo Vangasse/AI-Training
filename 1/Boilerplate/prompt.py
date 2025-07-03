@@ -19,7 +19,7 @@ PROMPT: str = dedent(text="""
     </Guidelines>
 
     <Output>
-    A User class with id, name, email, and a method to validate the email
+    {user_request}
     </Output>
     """
 )
