@@ -10,7 +10,6 @@ mcp = FastMCP("docker-agent-server-v1")
 
 # Define project and app directories
 PROJECT_DIR = "project"
-APP_DIR = "app"
 
 @mcp.tool()
 def list_project_files() -> str:
@@ -70,15 +69,15 @@ def save_app_file(filename: str, content: str) -> str:
     :return: A confirmation message or an error message.
     """
     try:
-        if not os.path.exists(APP_DIR):
-            os.makedirs(APP_DIR)
+        if not os.path.exists(PROJECT_DIR):
+            os.makedirs(PROJECT_DIR)
         
-        file_path = os.path.join(APP_DIR, filename)
+        file_path = os.path.join(PROJECT_DIR, filename)
         
         # Security check
         safe_path = os.path.abspath(file_path)
-        if not safe_path.startswith(os.path.abspath(APP_DIR)):
-             return f"Error: Access denied. Can only write files within the '{APP_DIR}' directory."
+        if not safe_path.startswith(os.path.abspath(PROJECT_DIR)):
+             return f"Error: Access denied. Can only write files within the '{PROJECT_DIR}' directory."
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -108,7 +107,7 @@ def run_shell_command(command: str) -> str:
             capture_output=True,
             text=True,
             check=False, # Don't raise exception on non-zero exit codes
-            cwd=APP_DIR # Run commands from the app directory
+            cwd=PROJECT_DIR # Run commands from the app directory
         )
         output = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
         print(output)

@@ -3,22 +3,32 @@
 # Prompt for the first agent: Analyze the project files.
 # It asks the LLM to act as an expert and return a structured JSON output,
 # which is crucial for reliably passing information to the next agent.
+# prompts.py
+
+# ... (keep other prompts the same)
+
 ANALYSIS_PROMPT = """
 You are an expert software developer specializing in dependency analysis and project containerization.
-Your task is to analyze the following project files to identify the programming language, web framework (if any), 
-application port, dependencies, and the command needed to run the application.
-Use the available functions of the MCP (Multi-Container Platform) to ensure the analysis is accurate and executable.
+Your task is to analyze the following project files to identify the programming language, web framework, 
+application port, dependencies, and the exact command needed to run the application.
 
 Please analyze the content of the files provided below:
 ---
 {file_contents}
 ---
-Based on your analysis, provide the output in a structured JSON format. The JSON object should have the following keys:
-- "language": The primary programming language (e.g., "python", "nodejs", "go").
-- "framework": The web framework used, if any (e.g., "FastAPI", "Express", "Flask").
+
+To determine the `run_command`, follow these steps carefully:
+1.  **Identify the Entry Point File**: Look for the main application file. Prioritize files in this order: `main.py`, `app.py`, `server.py`, `index.js`.
+2.  **Find the Application Instance**: Within the most likely entry point file, locate the application instantiation (e.g., `app = FastAPI()`, `app = Flask(__name__)`).
+3.  **Locate the Run Logic**: Find the code that runs the application, such as a call to `uvicorn.run()`, `app.run()`, or code within an `if __name__ == "__main__":` block.
+4.  **Construct the Command**: Create the shell command needed to execute that specific file and run logic. For example, if the entry point is `main.py` and it contains a FastAPI app instance named `app`, the command should be `uvicorn main:app --host 0.0.0.0 --port 8000`.
+
+Based on your analysis, provide the output in a structured JSON format. The JSON object must have the following keys:
+- "language": The primary programming language (e.g., "python", "nodejs").
+- "framework": The web framework used, if any (e.g., "FastAPI", "Express").
 - "port": The port the application is expected to run on. Default to 8000 if not specified.
 - "dependencies": A list of package managers or dependency files found (e.g., ["requirements.txt", "package.json"]).
-- "run_command": The shell command required to start the application (e.g., "uvicorn main:app --host 0.0.0.0 --port 8000").
+- "run_command": The precise, executable shell command required to start the application.
 
 Example response:
 {{
@@ -34,7 +44,8 @@ Example response:
 # It takes the structured JSON from the first agent as input.
 DOCKERFILE_PROMPT = """
 You are a DevOps expert specializing in creating optimized and secure Dockerfiles and docker-compose configurations.
-Based on the following project analysis, generate a `Dockerfile` and a `docker-compose.yml` file.
+Based on the following project analysis, generate a `Dockerfile` and a `docker-compose.yml` file. 
+Use the available functions of the MCP (Multi-Container Platform) to ensure the Dockerfile and docker-compose.yml are executable.
 
 Project Analysis:
 ---
@@ -47,7 +58,6 @@ Follow these best practices:
 3.  Copy only necessary files into the container.
 4.  The `docker-compose.yml` should build from the local Dockerfile and map the application port correctly.
 5.  Ensure the `run_command` from the analysis is used in the `CMD` instruction of the Dockerfile.
-6.  Use the available functions of the MCP (Multi-Container Platform) to ensure the Dockerfile and docker-compose.yml are executable.
 
 Provide the output as a single JSON object with two keys: "dockerfile" and "docker_compose_yml".
 
