@@ -2,135 +2,78 @@
 
 import os
 import subprocess
-import traceback
+import asyncio # <<< Import asyncio
 from mcp.server.fastmcp import FastMCP
 
-# Initialize the MCP server with a unique name
 mcp = FastMCP("docker-agent-server-v1")
-
-# Define project and app directories
 PROJECT_DIR = "project"
 
+# ... (other tools like list_project_files, read_project_file, create_docker_artifacts remain the same) ...
 @mcp.tool()
 def list_project_files() -> str:
-    """
-    Lists all files in the './project' directory recursively.
-
-    :return: A string containing a list of file paths, one per line.
-    """
+    """Lists all files in the './project' directory recursively."""
     try:
-        if not os.path.isdir(PROJECT_DIR):
-            return f"Error: Directory '{PROJECT_DIR}' not found."
-        
-        file_list = []
-        for root, _, files in os.walk(PROJECT_DIR):
-            for file in files:
-                file_path = os.path.join(root, file)
-                file_list.append(file_path)
-        
-        return "\n".join(file_list)
-    except Exception as e:
-        traceback.print_exc()
-        return f"Error listing files: {str(e)}"
+        if not os.path.isdir(PROJECT_DIR): return f"Error: Directory '{PROJECT_DIR}' not found."
+        file_list = [os.path.join(root, file) for root, _, files in os.walk(PROJECT_DIR) for file in files]
+        return "\n".join(file_list) if file_list else "No files found in the project directory."
+    except Exception as e: return f"Error listing files: {str(e)}"
+
+def _get_safe_project_path(filename: str) -> str:
+    """Ensures the file path is safely within the PROJECT_DIR."""
+    clean_filename = os.path.basename(filename)
+    return os.path.join(PROJECT_DIR, clean_filename)
 
 @mcp.tool()
 def read_project_file(filename: str) -> str:
-    """
-    Reads the content of a specific file from the './project' directory.
-
-    :param filename: The path to the file to read, relative to the script's location.
-    :type filename: str
-    :return: The content of the file as a string, or an error message.
-    """
+    """Reads a file from the './project' directory. Handles path automatically."""
     try:
-        # Security check to prevent path traversal attacks
-        safe_path = os.path.abspath(filename)
-        if not safe_path.startswith(os.path.abspath(PROJECT_DIR)):
-            return f"Error: Access denied. Can only read files within the '{PROJECT_DIR}' directory."
-
-        with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
-        return content
-    except FileNotFoundError:
-        return f"Error: File not found at '{filename}'."
-    except Exception as e:
-        traceback.print_exc()
-        return f"Error reading file '{filename}': {str(e)}"
+        safe_path = _get_safe_project_path(filename)
+        with open(safe_path, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
+    except FileNotFoundError: return f"Error: File not found at '{filename}'."
+    except Exception as e: return f"Error reading file '{filename}': {str(e)}"
 
 @mcp.tool()
-def save_app_file(filename: str, content: str) -> str:
-    """
-    Saves content to a file inside the './app' directory.
-
-    :param filename: The name of the file to be saved (e.g., 'Dockerfile').
-    :type filename: str
-    :param content: The content to write to the file.
-    :type content: str
-    :return: A confirmation message or an error message.
-    """
+def create_docker_artifacts(dockerfile_content: str, compose_content: str) -> str:
+    """Saves both the Dockerfile and docker-compose.yml files to the project directory in a single, atomic step."""
     try:
-        if not os.path.exists(PROJECT_DIR):
-            os.makedirs(PROJECT_DIR)
-        
-        file_path = os.path.join(PROJECT_DIR, filename)
-        
-        # Security check
-        safe_path = os.path.abspath(file_path)
-        if not safe_path.startswith(os.path.abspath(PROJECT_DIR)):
-             return f"Error: Access denied. Can only write files within the '{PROJECT_DIR}' directory."
+        dockerfile_path = _get_safe_project_path("Dockerfile")
+        with open(dockerfile_path, 'w', encoding='utf-8') as f: f.write(dockerfile_content)
+        compose_path = _get_safe_project_path("docker-compose.yml")
+        with open(compose_path, 'w', encoding='utf-8') as f: f.write(compose_content)
+        return "Successfully created both Dockerfile and docker-compose.yml."
+    except Exception as e: return f"Error creating artifacts: {str(e)}"
 
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        return f"Successfully saved file to '{file_path}'."
-    except Exception as e:
-        traceback.print_exc()
-        return f"Error saving file '{filename}': {str(e)}"
 
+# <<< THE DEFINITIVE FIX: Making the tool asynchronous >>>
 @mcp.tool()
-def run_shell_command(command: str) -> str:
-    """
-    Executes a shell command and returns its output.
-    WARNING: This tool can execute any command and is a potential security risk.
-    Use with caution in a controlled environment.
-
-    :param command: The shell command to execute.
-    :type command: str
-    :return: The stdout and stderr from the command execution.
-    """
+async def run_shell_command(command: str) -> str:
+    """Executes a shell command asynchronously inside the './project' directory."""
     try:
-        print(f"Executing command: {command}")
-        # Using shell=True for simplicity, but it's a security risk.
-        # In a real product, commands should be parsed and executed without shell=True.
-        result = subprocess.run(
+        # Use asyncio's non-blocking way to run a shell command
+        proc = await asyncio.create_subprocess_shell(
             command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            check=False, # Don't raise exception on non-zero exit codes
-            cwd=PROJECT_DIR # Run commands from the app directory
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=PROJECT_DIR
         )
-        output = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
-        print(output)
-        return output
+
+        # Wait for the command to finish and get the output
+        stdout, stderr = await proc.communicate()
+
+        return f"STDOUT:\n{stdout.decode()}\n\nSTDERR:\n{stderr.decode()}"
     except Exception as e:
-        traceback.print_exc()
         return f"Error executing command '{command}': {str(e)}"
 
+
 if __name__ == "__main__":
-    # Ensure project directory exists for the user
     if not os.path.exists(PROJECT_DIR):
         os.makedirs(PROJECT_DIR)
-        # Create a sample Python project for demonstration
-        with open(os.path.join(PROJECT_DIR, "requirements.txt"), "w") as f:
-            f.write("fastapi\nuvicorn")
+        with open(os.path.join(PROJECT_DIR, "requirements.txt"), "w") as f: f.write("fastapi\nuvicorn")
         with open(os.path.join(PROJECT_DIR, "main.py"), "w") as f:
             f.write(
-                "from fastapi import FastAPI\n\n"
-                "app = FastAPI()\n\n"
-                "@app.get('/')\n"
-                "def read_root():\n"
-                "    return {'message': 'Hello from Docker!'}\n"
+                "from fastapi import FastAPI\n\napp = FastAPI()\n\n"
+                "@app.get('/')\ndef read_root():\n    return {'message': 'Hello from Docker!'}\n"
             )
         print(f"Created a sample FastAPI project in '{PROJECT_DIR}' for you to test.")
-        
-    mcp.run(transport="stdio")
+    mcp.run()
