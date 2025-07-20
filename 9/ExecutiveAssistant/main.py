@@ -1,3 +1,4 @@
+from textwrap import dedent
 from docling.document_converter import DocumentConverter
 from semantic_text_splitter import TextSplitter
 from agno.embedder.openai import OpenAIEmbedder
@@ -9,8 +10,9 @@ from dotenv import load_dotenv
 from agno.agent import Agent
 import os
 
+# Import both prompts from your prompts file
+from prompts import SYSTEM_PROMPT_EXTRACTION, SYSTEM_PROMPT_FACT_CHECKING
 
-from prompts import PROMPT_MINUTE_EXTRACTION
 
 def create_qdrant_table(
     table_name: str, embedder: OpenAIEmbedder, vector_db: Qdrant
@@ -40,10 +42,11 @@ def create_qdrant_table(
 if __name__ == "__main__":
     load_dotenv()
 
-    INSERT_CHUNKS = False
+    INSERT_CHUNKS = True
     WITH_CONTEXT = True
 
-    QUERY = "What were the specific action items with responsible parties & deadlines?"
+    # We will test with a query that mixes internal data with a public fact.
+    QUERY = "What was decided about Project Chimera and what was the competitive threat mentioned by Marcus Thorne?"
 
     embedder = OpenAIEmbedder(api_key=os.getenv("OPENAI_API_KEY"))
     vector_db = Qdrant(
@@ -61,18 +64,41 @@ if __name__ == "__main__":
         docs = [Document(content=chunk) for chunk in chunks]
         vector_db.insert(docs)
 
+    # --- Step 1: Minute Extraction Agent ---
     if WITH_CONTEXT:
-        context = [frag.content for frag in vector_db.search(QUERY, 2)]
-        context = " - " + "\n - ".join(context)
+        # FIX 1: Increased the number of retrieved chunks from 3 to 5.
+        # This provides a wider context to the agent, making it more likely
+        # to find information for both parts of a complex query.
+        context_chunks = [frag.content for frag in vector_db.search(QUERY, 5)]
+        context = " - " + "\n - ".join(context_chunks)
     else:
         context = ""
 
-    PROMPT_MINUTE_EXTRACTION = PROMPT_MINUTE_EXTRACTION.format(context=context)
+    # Prepare the prompt for the first agent
+    final_extraction_prompt = SYSTEM_PROMPT_EXTRACTION.format(context=context)
 
     agent_minute_extraction = Agent(
         show_tool_calls=True,
-        model=OpenAIChat(id="gpt-4o-mini", system_prompt=PROMPT_MINUTE_EXTRACTION),
+        model=OpenAIChat(id="gpt-4o-mini", system_prompt=final_extraction_prompt),
+        search_knowledge=False,
+    )
+
+    print("--- 1. Minute Extraction Result ---")
+    extraction_response = agent_minute_extraction.run(QUERY)
+    # Ensure we print the string content for clarity
+    print(extraction_response.content)
+    print("\n" + "="*40 + "\n")
+
+
+    # --- Step 2: Fact-Checking Agent ---
+    print("--- 2. Fact-Checking Result ---")
+
+    agent_fact_checking = Agent(
+        show_tool_calls=True,
+        model=OpenAIChat(id="gpt-4o-mini", system_prompt=SYSTEM_PROMPT_FACT_CHECKING),
         search_knowledge=True,
     )
 
-    agent_minute_extraction.print_response(QUERY, markdown=True)
+    # FIX 2: Pass the .content attribute of the response object, not the object itself.
+    # The agent's input query must be a string.
+    agent_fact_checking.print_response(extraction_response.content, markdown=True)

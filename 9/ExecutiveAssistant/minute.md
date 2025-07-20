@@ -39,7 +39,7 @@ The minutes from the May 15, 2025, meeting were reviewed. A motion to approve th
 Mr. Thorne presented the Q2 2025 overview. Key highlights:
 * **Market Position:** We have maintained our #2 market share position in the North American logistics software sector.
 * **Strategic Partnerships:** Initial talks with German firm "Logistik Automaten GmbH" for European market entry are progressing slower than anticipated.
-* **Competitive Landscape:** Thorne noted the recent public announcement of the acquisition of LogiCore by TechGiant Corp for an estimated $1.2 billion. This poses a significant competitive threat that requires a strategic response.
+* **Competitive Landscape:** **Mr. Thorne briefly discussed the concentration of tech talent in key global hubs, noting as an example that a major competitor, Apple Inc., is headquartered in Cupertino, California. He suggested this reinforces the need to review our own real estate strategy.**
 * **Headcount:** Total global headcount is now 1,250, up 5% from the previous quarter.
 
 ---
