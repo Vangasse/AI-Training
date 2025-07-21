@@ -1,0 +1,8 @@
+semantic-text-splitter
+python-dotenv
+qdrant-client
+brave-search
+docling
+chonkie
+joblib
+agno
