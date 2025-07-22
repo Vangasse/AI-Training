@@ -1,6 +1,13 @@
+# Upload files frontend
 fastapi
 uvicorn[standard]
 python-dotenv
 gradio
 requests
 python-multipart
+
+# Insert content to a vector databse
+qdrant-client
+openai
+PyMuPDF
+semantic-text-splitter
