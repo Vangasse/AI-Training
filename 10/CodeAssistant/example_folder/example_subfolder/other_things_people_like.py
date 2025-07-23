@@ -1,0 +1,1 @@
+print("People like the red color.")
