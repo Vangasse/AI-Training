@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+qdrant-client
+openai
+semantic-text-splitter
+PyMuPDF
+
+gradio
+requests
+python-dotenv
