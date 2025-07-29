@@ -1,0 +1,11 @@
+# Core application dependencies
+python-dotenv
+pandas
+joblib
+
+# Agno library and its dependencies
+agno
+qdrant-client
+docling
+semantic-text-splitter
+brave-search
